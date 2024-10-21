@@ -1,12 +1,15 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 import { openai } from "../vars/openai.ts";
 
+const apiKey = import.meta.env.VITE_OPEN_AI_API_KEY;
+
 export const Conversation = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState<{ role: string, content: string }[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [isListening, setIsListening] = useState(false);
 
+  // @ts-ignore
   const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
   // add the last bot text to the assignments
 
@@ -23,7 +26,7 @@ export const Conversation = () => {
     setIsListening(false);
   };
 
-  recognition.onresult = async (event) => {
+  recognition.onresult = async (event: any) => {
     const lastResultIndex = event.results.length - 1;
     const transcript = event.results[lastResultIndex][0].transcript;
 
@@ -51,6 +54,11 @@ export const Conversation = () => {
           messages: [...messages, { role: "user", content: message }],
           model: "gpt-4o-mini",
         },
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          }
+        }
       );
 
       const botMessage = { role: "assistant", content: response.choices[0].message.content };

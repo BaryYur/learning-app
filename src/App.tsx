@@ -1,5 +1,3 @@
-import React from "react";
-
 import { Conversation } from "./components";
 
 import "./App.css";
