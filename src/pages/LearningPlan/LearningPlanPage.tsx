@@ -20,9 +20,14 @@ export const LearningPlanPage = () => {
           <p className="font-semibold text-center">Task based on learning plan</p>
 
           {teacherConversations.length > 0 ? (
-            <ul className="py-[20px]">
+            <ul className="py-[20px] flex flex-col items-center gap-[8px]">
               {teacherConversations.map((task) => (
-                <li key={task.id}>{task.title}</li>
+                <li
+                  key={task.id}
+                  className="w-[400px] py-[8px] rounded-[20px] text-center bg-gray-200"
+                >
+                  {task.title}
+                </li>
               ))}
             </ul>
           ) : (

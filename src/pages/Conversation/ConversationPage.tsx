@@ -1,8 +1,11 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 
 import { RealtimeClient } from "@openai/realtime-api-beta";
+// @ts-ignore
 import { ItemType } from "@openai/realtime-api-beta/dist/lib/client.js";
+// @ts-ignore
 import { WavRecorder, WavStreamPlayer } from "../../lib/wavtools/index.js";
+// @ts-ignore
 import { instructions } from "../../utils/conversation_config.js";
 
 import PauseIcon from "../../assets/icons/pause-icon.svg";
@@ -42,9 +45,9 @@ export const ConversationPage = () => {
 
   const connectConversation = useCallback(async () => {
     const client = clientRef.current;
-    client.updateSession({ turn_detection: { type: "server_vad" } });
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
+    client.updateSession({ turn_detection: { type: "server_vad" } });
 
     // Set state variables
     startTimeRef.current = new Date().toISOString();
@@ -58,6 +61,7 @@ export const ConversationPage = () => {
 
     // Connect to realtime API
     await client.connect();
+    console.log("Connected to Realtime API");
     // client.sendUserMessageContent([
     //   {
     //     type: `input_text`,
@@ -66,13 +70,13 @@ export const ConversationPage = () => {
     // ]);
 
     if (client.getTurnDetectionType() === "server_vad") {
-      await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+      await wavRecorder.record((data: any) => client.appendInputAudio(data.mono));
     }
   }, []);
 
   const disconnectConversation = useCallback(async () => {
     setIsConnected(false);
-    // setRealtimeEvents([]);
+    setRealtimeEvents([]);
 
     const client = clientRef.current;
     client.disconnect();
@@ -120,12 +124,13 @@ export const ConversationPage = () => {
     // Set instructions
     client.updateSession({ instructions: instructions });
     // Set transcription, otherwise we don't get user transcriptions back
-    client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
+    client.updateSession({ input_audio_transcription: { model: "whisper-1" } });
 
     // handle realtime events from client + server for event logging
     client.on("realtime.event", (realtimeEvent: RealtimeEvent) => {
       setRealtimeEvents((realtimeEvents) => {
         const lastEvent = realtimeEvents[realtimeEvents.length - 1];
+
         if (lastEvent?.event.type === realtimeEvent.event.type) {
           // if we receive multiple events in a row, aggregate them for display purposes
           lastEvent.count = (lastEvent.count || 0) + 1;
@@ -135,9 +140,13 @@ export const ConversationPage = () => {
         }
       });
     });
-    client.on("error", (event: any) => console.error(event));
+    client.on("error", (event: any) => {
+      console.log("connection failed");
+      console.error(event);
+    });
     client.on("conversation.interrupted", async () => {
       const trackSampleOffset = await wavStreamPlayer.interrupt();
+      console.log('connection ok')
 
       if (trackSampleOffset?.trackId) {
         const { trackId, offset } = trackSampleOffset;
@@ -176,22 +185,22 @@ export const ConversationPage = () => {
       data-component="ConsolePage"
       className="flex flex-col justify-between h-[100vh] w-full m-auto"
     >
-      <div>
-        <div className="p-[20px] border-b-[1px] ">
+      <div className="pt-[100px]">
+        <div className="p-[20px] border-b-[1px] fixed z-[1] top-0 w-full bg-white">
           <h2 className="text-center text-[20px]">AI Assistant</h2>
         </div>
 
-        {/*{!isConnected ? (*/}
-          <div className="max-h-[calc(100dvh-160px)] overflow-y-auto px-[20px] w-full m-auto md:w-[700px]">
+        {!isConnected ? (
+          <div className="px-[20px] pb-[200px] w-full m-auto md:w-[700px]">
             {!items.length && (
-              <div className="h-[calc(100dvh-165px)] flex items-center justify-center">
+              <div className="flex items-center justify-center">
                 <p>Start talk</p>
               </div>
             )}
 
             {items.length > 0 && <div>
-              <div className="py-[10px] h-[calc(100dvh-165px)] flex flex-col gap-[15px]" data-conversation-content>
-                {items.map((conversationItem, i) => {
+              <div className="py-[10px] flex flex-col gap-[15px]" data-conversation-content>
+                {items.map((conversationItem) => {
                   return (
                     <div className={`${conversationItem.role === "user" && "justify-end"} flex`} key={conversationItem.id}>
                       <div className="max-w-[80%] flex flex-col gap-[8px]">
@@ -200,7 +209,7 @@ export const ConversationPage = () => {
                             <span className="border-[1px] bg-gray-200 p-[10px] rounded-[8px]">
                               {(
                                 conversationItem.role || conversationItem.type
-                              ).replaceAll("_", " ")}
+                              )}
                             </span>
                           </div>
                         </div>
@@ -236,12 +245,12 @@ export const ConversationPage = () => {
                             )}
                         </div>
 
-                        {conversationItem.formatted.file && (
-                          <audio
-                            src={conversationItem.formatted.file.url}
-                            controls
-                          />
-                        )}
+                        {/*{conversationItem.formatted.file && (*/}
+                        {/*  <audio*/}
+                        {/*    src={conversationItem.formatted.file.url}*/}
+                        {/*    controls*/}
+                        {/*  />*/}
+                        {/*)}*/}
                       </div>
                     </div>
                   );
@@ -249,19 +258,19 @@ export const ConversationPage = () => {
               </div>
             </div>}
           </div>
-        {/*) : (*/}
-        {/*   <div className="h-[calc(100dvh-160px)] flex items-center justify-center">*/}
-        {/*     <p>talk effect</p>*/}
-        {/*   </div>*/}
-        {/*)}*/}
+        ) : (
+           <div className="h-[calc(100dvh-160px)] flex items-center justify-center">
+             <p>talk effect</p>
+           </div>
+        )}
       </div>
 
       <div
         className={`
           ${!isConnected ? "justify-end" : "justify-start"}
           flex items-end min-h-[90px] pt-[30px]
-          pb-[20px] relative z-0 px-[20px]
-          w-full m-auto md:w-[700px] md:px-0
+          pb-[20px] fixed bottom-0 z-0 px-[20px]
+          w-full bg-white
         `}
       >
         {isConnected && (
@@ -273,7 +282,7 @@ export const ConversationPage = () => {
           </button>
         )}
 
-        <div className="absolute top-[0] w-[calc(100%-20px)] z-[1] flex justify-center md:w-[calc(100%)]">
+        <div className="absolute top-[0] left-[20px] w-[calc(100%-20px)] z-[1] flex justify-center">
           <button
             className={`${!isConnected && "border-[1px]"} rounded-[50%] bg-white p-[10px]`}
             style={{ boxShadow: isConnected ? "5px 4px 20px 0px rgba(0, 0, 0, 0.13)" : "" }}
@@ -289,4 +298,4 @@ export const ConversationPage = () => {
       </div>
     </div>
   );
-}
+};
