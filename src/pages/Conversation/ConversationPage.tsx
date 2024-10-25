@@ -1,4 +1,10 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useCallback,
+  useState,
+  useContext,
+} from "react";
 
 import { RealtimeClient } from "@openai/realtime-api-beta";
 // @ts-ignore
@@ -6,11 +12,20 @@ import { ItemType } from "@openai/realtime-api-beta/dist/lib/client.js";
 // @ts-ignore
 import { WavRecorder, WavStreamPlayer } from "../../lib/wavtools/index.js";
 // @ts-ignore
-import { instructions } from "../../utils/conversation_config.js";
+import { teacherInstructions } from "../../utils/conversation_config.js";
+
+import { Link } from "react-router-dom";
+
+import TeacherConversationsContext from "../../context/teacher-conversations.tsx";
+
+import { Modal, Button } from "../../components";
 
 import PauseIcon from "../../assets/icons/pause-icon.svg";
 import MicrophoneIcon from "../../assets/icons/microphone-light.svg";
 import CrossIconWhite from "../../assets/icons/cross-icon-white.svg";
+import LeftArrowIcon from "../../assets/icons/left-arrow.svg";
+
+// import { openai } from "../../vars/open-ai.ts";
 
 interface RealtimeEvent {
   time: string;
@@ -22,6 +37,8 @@ interface RealtimeEvent {
 const apiKey = import.meta.env.VITE_OPEN_AI_API_KEY;
 
 export const ConversationPage = () => {
+  const { addTeacherTask } = useContext(TeacherConversationsContext);
+
   const wavRecorderRef = useRef<WavRecorder>(
     new WavRecorder({ sampleRate: 24000 })
   );
@@ -43,10 +60,19 @@ export const ConversationPage = () => {
   const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
+  const [isAssignmentCreated, setIsAssignmentCreated] = useState(false);
+  const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
+  // const [summary, setSummary] = useState("");
+
   const connectConversation = useCallback(async () => {
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
+    client.defaultSessionConfig = {
+      modalities: ["text", "audio"],
+      instructions: "Please communicate in English only.",
+      voice: "en-US",
+    };
     client.updateSession({ turn_detection: { type: "server_vad" } });
 
     // Set state variables
@@ -61,11 +87,11 @@ export const ConversationPage = () => {
 
     // Connect to realtime API
     await client.connect();
-    console.log("Connected to Realtime API");
+
     // client.sendUserMessageContent([
     //   {
     //     type: `input_text`,
-    //     text: `Hello!`,
+    //     text: `create an assignment for learning basics of react js`,
     //   },
     // ]);
 
@@ -73,6 +99,40 @@ export const ConversationPage = () => {
       await wavRecorder.record((data: any) => client.appendInputAudio(data.mono));
     }
   }, []);
+
+  // for teacher role
+  // const generateSummary = async () => {
+  //   try {
+  //     const conversationItems = [...items];
+  //
+  //     console.log('gen for items', items);
+  //
+  //     const conversationText = conversationItems
+  //       .map(item => `${item.role}: ${item.formatted.text || item.formatted.transcript || ''}`)
+  //       .join('\n');
+  //
+  //     const completion = await openai.chat.completions.create({
+  //       messages: [
+  //         {
+  //           role: "system",
+  //           content: "You are an AI assistant. You need to determine if there is enough, generate the summary and assignment; otherwise, indicate what additional information is needed."
+  //         },
+  //         {
+  //           role: "user",
+  //           content: `Based on the following conversation, determine if there is enough information to generate a summary and assignment:\n\n${conversationText}`
+  //         }
+  //       ],
+  //       model: "gpt-4o-mini",
+  //     });
+  //
+  //     const generatedSummary = completion.choices[0]?.message?.content || "No response generated.";
+  //
+  //     setSummary(generatedSummary);
+  //     setIsAssignmentCreated(true);
+  //   } catch (error) {
+  //     console.error('Failed to generate summary:', error);
+  //   }
+  // };
 
   const disconnectConversation = useCallback(async () => {
     setIsConnected(false);
@@ -110,8 +170,10 @@ export const ConversationPage = () => {
     const conversationEls = [].slice.call(
       document.body.querySelectorAll("[data-conversation-content]")
     );
+
     for (const el of conversationEls) {
       const conversationEl = el as HTMLDivElement;
+
       conversationEl.scrollTop = conversationEl.scrollHeight;
     }
   }, [items]);
@@ -122,7 +184,7 @@ export const ConversationPage = () => {
     const client = clientRef.current;
 
     // Set instructions
-    client.updateSession({ instructions: instructions });
+    client.updateSession({ instructions: teacherInstructions });
     // Set transcription, otherwise we don't get user transcriptions back
     client.updateSession({ input_audio_transcription: { model: "whisper-1" } });
 
@@ -140,13 +202,13 @@ export const ConversationPage = () => {
         }
       });
     });
+
     client.on("error", (event: any) => {
-      console.log("connection failed");
       console.error(event);
     });
+
     client.on("conversation.interrupted", async () => {
       const trackSampleOffset = await wavStreamPlayer.interrupt();
-      console.log('connection ok')
 
       if (trackSampleOffset?.trackId) {
         const { trackId, offset } = trackSampleOffset;
@@ -154,6 +216,7 @@ export const ConversationPage = () => {
         await client.cancelResponse(trackId, offset);
       }
     });
+
     client.on("conversation.updated", async ({ item, delta }: any) => {
       const items = client.conversation.getItems();
 
@@ -187,13 +250,18 @@ export const ConversationPage = () => {
     >
       <div className="pt-[100px]">
         <div className="p-[20px] border-b-[1px] fixed z-[1] top-0 w-full bg-white">
+          <div className="absolute top-[20px] left-[20px]">
+            <Link to="/teacher-tasks">
+              <img src={`${LeftArrowIcon}`} />
+            </Link>
+          </div>
           <h2 className="text-center text-[20px]">AI Assistant</h2>
         </div>
 
         {!isConnected ? (
           <div className="px-[20px] pb-[200px] w-full m-auto md:w-[700px]">
-            {!items.length && (
-              <div className="flex items-center justify-center">
+            {items.length === 0 && (
+              <div className="h-[calc(100dvh-340px)] flex items-center justify-center">
                 <p>Start talk</p>
               </div>
             )}
@@ -203,7 +271,7 @@ export const ConversationPage = () => {
                 {items.map((conversationItem) => {
                   return (
                     <div className={`${conversationItem.role === "user" && "justify-end"} flex`} key={conversationItem.id}>
-                      <div className="max-w-[80%] flex flex-col gap-[8px]">
+                      <div className="max-w-[90%] flex flex-col gap-[8px]">
                         <div>
                           <div className={`${conversationItem.role === "user" && "justify-end"} flex`}>
                             <span className="border-[1px] bg-gray-200 p-[10px] rounded-[8px]">
@@ -257,10 +325,12 @@ export const ConversationPage = () => {
                 })}
               </div>
             </div>}
+
+            {/*{summary !== "" && <p className="border-[1px] bg-gray-200 p-[10px] rounded-[8px]">{summary}</p>}*/}
           </div>
         ) : (
-           <div className="h-[calc(100dvh-160px)] flex items-center justify-center">
-             <p>talk effect</p>
+           <div className="flex items-center justify-center">
+             <p>Conversation</p>
            </div>
         )}
       </div>
@@ -282,20 +352,60 @@ export const ConversationPage = () => {
           </button>
         )}
 
-        <div className="absolute top-[0] left-[20px] w-[calc(100%-20px)] z-[1] flex justify-center">
+        <div className="absolute top-[0] left-[10px] w-[calc(100%-20px)] z-[1] flex justify-center">
           <button
-            className={`${!isConnected && "border-[1px]"} rounded-[50%] bg-white p-[10px]`}
-            style={{ boxShadow: isConnected ? "5px 4px 20px 0px rgba(0, 0, 0, 0.13)" : "" }}
-            onClick={isConnected ? disconnectConversation : connectConversation}
-          >
-            {isConnected ? <img src={`${PauseIcon}`} alt="pause" /> : <img src={`${MicrophoneIcon}`} alt="microphone" />}
-          </button>
+            className={`${!isConnected && "border-[1px]"} rounded-[50%] bg-white p-[10px] w-[77.6px] h-[77.6px]`}
+            style={{
+              boxShadow: isConnected ? "5px 4px 20px 0px rgba(0, 0, 0, 0.13)" : "",
+              backgroundImage: isConnected ? `url(${PauseIcon})` : `url(${MicrophoneIcon})`,
+              backgroundPositionX: "center",
+              backgroundPositionY: "center",
+              backgroundRepeat: "no-repeat",
+            }}
+            onTouchStart={connectConversation}
+            onTouchEnd={disconnectConversation}
+          />
         </div>
 
-        {items.length !== 0 && !isConnected && (
-          <div className="self-end">Assign</div>
+        {items.length > 1 && !isConnected && (
+          <div className="self-end relative z-[2]" >
+            <Button
+              className="text-main-red border-main-red px-[22px] hover:bg-main-red hover:text-white"
+              onClick={() => setIsAssignmentModalOpen(true)}
+            >
+              Assign
+            </Button>
+          </div>
         )}
       </div>
+
+      <Modal
+        isOpen={isAssignmentModalOpen}
+        onClose={() => setIsAssignmentModalOpen(false)}
+      >
+        <p className="text-center font-semibold text-[18px] text-dark-blue">Assignment</p>
+
+        <div className="flex flex-col gap-[10px] pt-[20px]">
+          <label>Assignment details</label>
+
+          <p className="flex gap-[10px]">
+            <span className="text-gray-500">Deadline:</span>
+            <span>12/12/1222</span>
+          </p>
+
+          <div className="flex justify-center">
+            <Button
+              className="bg-main-red text-white w-full border-main-red sm:w-[120px] "
+              onClick={() => {
+                addTeacherTask("some title");
+                setIsAssignmentModalOpen(false);
+              }}
+            >
+              Assign
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

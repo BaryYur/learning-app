@@ -7,8 +7,12 @@ export default {
   theme: {
     extend: {
       colors: {
+        // components
         "main-red": "#CC1316",
         "light-gray": "#E9ECEF",
+
+        // text
+        "dark-blue": "#001434",
 
         // contentBrandPrimaryMedium: 'black',
       },

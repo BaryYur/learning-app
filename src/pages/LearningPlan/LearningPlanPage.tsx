@@ -36,7 +36,12 @@ export const LearningPlanPage = () => {
             </div>
           )}
         </div>
-        <div className="flex justify-center items-center flex-col">
+        <div
+          className="
+            flex justify-center items-center flex-col fixed bottom-0
+            w-full pb-[12px] bg-white
+          "
+        >
           <p className="text-[15px] font-semibold">Let's create a new task</p>
           <Link to="/ai-conversation" className="border-[1px] p-[10px] rounded-[50%] mt-[20px]">
             <img src={`${MicrophoneIcon}`} alt="microphone"/>
